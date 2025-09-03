@@ -9,6 +9,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const songProgressFill = document.getElementById("songProgressFill");
   const songTime = document.getElementById("songTime");
 
+  // Meter UI
+  const micMeter = document.getElementById("micMeter");
+  const micMeterFill = document.getElementById("micMeterFill");
+  const micMeterThresh = document.getElementById("micMeterThresh");
+
   let candles = [];
   let blown = false;
 
@@ -41,62 +46,46 @@ document.addEventListener("DOMContentLoaded", () => {
     "#7F00FF",
   ];
 
-  // -------------------- EVEN RINGS (deterministic, no touching) --------------------
+  /* -------------------------------------------------------------------------- */
+  /*                        DETERMINISTIC CANDLES (EVEN RINGS)                  */
+  /* -------------------------------------------------------------------------- */
   function placeCandlesEvenRings() {
     const COUNT = 67;
 
-    // Geometry in cake-relative units
     const W = cake.getBoundingClientRect().width; // px
-    const cx = 50; // %
-    const cy = 28; // % (center of top layer)
-    const squish = 0.45; // vertical squash of ellipse
+    const cx = 50;
+    const cy = 28;
+    const squish = 0.45;
 
-    // Candle base is 10px wide; add gap so bases never touch.
     const candlePx = 10;
-    const gapPx = clamp(W * 0.022, 8, 12); // 8–12px depending on cake size
-    let minCenterDistPx = candlePx + gapPx; // guaranteed base-to-base clearance
+    const gapPx = clamp(W * 0.022, 8, 12); // keep bases from touching
+    const minCenterDistPx = candlePx + gapPx;
 
-    // Outer usable horizontal radius on top layer (in % of cake width)
-    const R_OUT = 46; // conservative; stays inside the icing
-    const R_IN = 8; // don't place too close to center to avoid crowding
+    const R_OUT = 46;
+    const R_IN = 8;
 
-    // Radial step (worst case when θ ≈ 90°, y separation is squished)
     const minDistPct = (minCenterDistPx / W) * 100;
-    const dR = (minDistPct / squish) * 1.05; // safety factor
+    const dR = (minDistPct / squish) * 1.05;
 
     const rings = [];
     for (let r = R_OUT; r >= R_IN; r -= dR) rings.push(r);
 
-    // Place rings from outside in, distributing counts to hit exactly 67
     let remaining = COUNT;
     let idx = 0;
 
     for (let i = 0; i < rings.length && remaining > 0; i++) {
       const r = rings[i];
 
-      // Conservative circumference using squished radius
       const circPx = 2 * Math.PI * ((r / 100) * W) * squish;
       let maxOnRing = Math.floor(circPx / minCenterDistPx);
       if (maxOnRing < 1) continue;
-
-      // Also ensure adjacent ring angular neighbors don't collide:
-      // leave at least 1.15x spacing margin on inner rings
       if (i > 0) maxOnRing = Math.floor(maxOnRing * 0.92);
 
-      // Try to distribute remaining evenly across remaining rings
       const ringsLeft = rings.length - i;
       let target = Math.ceil(remaining / ringsLeft);
-
-      // Cap by physical max
-      let n = Math.min(target, maxOnRing);
-
-      // Never exceed remaining
-      n = Math.min(n, remaining);
-
-      // Avoid tiny 1–2 clusters by bumping up to at least 4 per ring if possible
+      let n = Math.min(target, maxOnRing, remaining);
       if (n < 4 && remaining >= 4 && maxOnRing >= 4) n = 4;
 
-      // Even angular spacing with staggered phase to avoid radial alignment
       const step = (2 * Math.PI) / n;
       const offset = i % 2 ? step / 2 : step / 3;
 
@@ -105,21 +94,15 @@ document.addEventListener("DOMContentLoaded", () => {
         const x = cx + r * Math.cos(a);
         const y = cy + r * squish * Math.sin(a);
 
-        // Create candle with deterministic color/height/flicker
         const color = palette[idx % palette.length];
-        const height = 26 + (idx % 4) * 2; // 26/28/30/32 pattern
+        const height = 26 + (idx % 4) * 2;
         createStickCandle(x, y, color, height, idx);
         idx++;
       }
-
       remaining -= n;
     }
 
-    // If due to extreme constraints we still didn't place all, gently reduce spacing once.
     if (remaining > 0) {
-      const shrink = 0.94;
-      minCenterDistPx = Math.max(14, minCenterDistPx * shrink);
-      // recurse one quick pass with reduced spacing to fill the remainder
       fillRemainder(rings, cx, cy, squish, W, minCenterDistPx, remaining, idx);
     }
   }
@@ -184,7 +167,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return Math.max(lo, Math.min(hi, n));
   }
 
-  // -------------------- Music: WebAudio Happy Birthday --------------------
+  /* -------------------------------------------------------------------------- */
+  /*                               MUSIC (MELODY)                               */
+  /* -------------------------------------------------------------------------- */
   function initAudio() {
     if (audioCtx) return;
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -266,28 +251,56 @@ document.addEventListener("DOMContentLoaded", () => {
     scheduledOnce = true;
   }
 
-  // -------------------- Mic & Blow Detection (only while playing) --------------------
+  /* -------------------------------------------------------------------------- */
+  /*                    MIC / BLOW DETECTION — MORE SENSITIVE                    */
+  /* -------------------------------------------------------------------------- */
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  // Tunable knobs (lower = more sensitive)
+  const TARGET_RMS = 0.25; // for meter scaling
+  const BASE_MARGIN = isMobile ? 0.02 : 0.025; // add to noise floor
+  const ABS_MIN = isMobile ? 0.04 : 0.045; // ignore very tiny signals
+  const BURST_SOFT = isMobile ? 120 : 160; // ms above gate to trigger
+  const BURST_STRONG = isMobile ? 90 : 120; // if far above gate, trigger faster
+  const STRONG_MULT = 1.35; // "far above" factor
+
   async function startMic() {
     try {
       micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true },
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
       });
-      micSource = audioCtx.createMediaStreamSource(micStream);
-      analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 1024;
-      micSource.connect(analyser);
-      micStatus.textContent =
-        "Microphone: listening… blow to put out the candles";
-      micStatus.className = "status good";
-      tapToBlow.style.display = "inline-flex";
-      meterLoop(); // begin detection
-    } catch (err) {
-      console.warn("Mic error", err);
-      micStatus.textContent =
-        "Microphone blocked. Use the backup “Tap to blow”.";
-      micStatus.className = "status warn";
-      tapToBlow.style.display = "inline-flex";
+    } catch (e1) {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch (e2) {
+        console.warn("Mic error", e2);
+        micStatus.textContent =
+          "Microphone blocked. Use the backup “Tap to blow”.";
+        micStatus.className = "status warn";
+        tapToBlow.style.display = "inline-flex";
+        micMeter?.classList.remove("listening");
+        return;
+      }
     }
+
+    micSource = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.6; // faster response → more sensitive
+    micSource.connect(analyser);
+
+    micStatus.textContent =
+      "Microphone: listening… blow to put out the candles";
+    micStatus.className = "status good";
+    tapToBlow.style.display = "inline-flex";
+
+    meterLoop_reset();
+    micMeter?.classList.add("listening");
+    meterLoop();
   }
 
   function stopMic() {
@@ -298,6 +311,21 @@ document.addEventListener("DOMContentLoaded", () => {
       micStream = null;
     }
     analyser = null;
+    micMeter?.classList.remove("listening");
+    if (micMeterFill) micMeterFill.style.width = "0%";
+  }
+
+  const timeBuf = new Uint8Array(2048);
+  let noiseFloor = 0;
+  let armed = false;
+  let accumMs = 0;
+
+  function meterLoop_reset() {
+    noiseFloor = 0;
+    armed = false;
+    accumMs = 0;
+    meterLoop._last = performance.now();
+    meterLoop._armTimer = 0;
   }
 
   function meterLoop() {
@@ -306,24 +334,59 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(data);
+    const now = performance.now();
+    const dt = Math.min(120, now - (meterLoop._last || now));
+    meterLoop._last = now;
 
-    let sum = 0;
-    for (let i = 0; i < data.length; i++) sum += data[i] * data[i];
-    const rms = Math.sqrt(sum / data.length) / 255;
+    analyser.getByteTimeDomainData(timeBuf);
 
-    if (!meterLoop._accum) meterLoop._accum = 0;
-    const threshold = 0.18;
-    const dt = 1000 / 60;
-
-    if (isPlaying && rms > threshold) meterLoop._accum += dt;
-    else meterLoop._accum = Math.max(0, meterLoop._accum - dt * 0.9);
-
-    if (isPlaying && meterLoop._accum > 650) {
-      extinguish();
-      meterLoop._accum = 0;
+    // RMS + peak (helps fast strong bursts trigger sooner)
+    let sumSq = 0;
+    let peak = 0;
+    for (let i = 0; i < timeBuf.length; i++) {
+      const v = (timeBuf[i] - 128) / 128;
+      sumSq += v * v;
+      const a = Math.abs(v);
+      if (a > peak) peak = a;
     }
+    const rms = Math.sqrt(sumSq / timeBuf.length);
+
+    // Adaptive noise floor (slow EMA so it doesn't rise too quickly)
+    const alpha = 0.02;
+    noiseFloor =
+      noiseFloor === 0 ? rms : rms * alpha + noiseFloor * (1 - alpha);
+
+    // Small calibration delay
+    if (!armed) {
+      if ((meterLoop._armTimer || 0) > 300) {
+        armed = true;
+      } else {
+        meterLoop._armTimer = (meterLoop._armTimer || 0) + dt;
+      }
+    }
+
+    // Dynamic gate
+    const gate = Math.max(noiseFloor + BASE_MARGIN, ABS_MIN);
+
+    if (isPlaying && armed && rms > gate) {
+      const strong = rms > gate * STRONG_MULT || peak > 0.55;
+      const weight = 1 + Math.min((rms - gate) / gate, 1); // faster when well above gate
+      accumMs += dt * weight;
+      const need = strong ? BURST_STRONG : BURST_SOFT;
+      if (accumMs >= need) {
+        extinguish();
+        accumMs = 0;
+      }
+    } else {
+      // decay slowly so short pauses don't reset everything
+      accumMs = Math.max(0, accumMs - dt * 0.5);
+    }
+
+    // Meter UI updates
+    const norm = clamp(rms / TARGET_RMS, 0, 1) * 100;
+    const gatePct = clamp(gate / TARGET_RMS, 0, 1) * 100;
+    if (micMeterFill) micMeterFill.style.width = norm.toFixed(1) + "%";
+    if (micMeterThresh) micMeterThresh.style.left = gatePct.toFixed(1) + "%";
 
     rafIdMeter = requestAnimationFrame(meterLoop);
   }
@@ -346,7 +409,9 @@ document.addEventListener("DOMContentLoaded", () => {
     micStatus.className = "status good";
   }
 
-  // -------------------- Song Bar Controls --------------------
+  /* -------------------------------------------------------------------------- */
+  /*                             SONG BAR CONTROLS                              */
+  /* -------------------------------------------------------------------------- */
   songToggle.addEventListener("click", async () => {
     initAudio();
 
@@ -401,10 +466,10 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${m}:${sec.toString().padStart(2, "0")}`;
   }
 
-  // Place candles (deterministic, evenly spaced)
+  // Init candles (deterministic layout)
   placeCandlesEvenRings();
 
-  // Relight + backup tap (backup only while playing)
+  // Relight + backup tap
   relightBtn.addEventListener("click", relight);
   tapToBlow.addEventListener("click", () => {
     if (isPlaying) extinguish();
