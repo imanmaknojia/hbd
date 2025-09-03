@@ -1,0 +1,146 @@
+/* Layout */
+body {
+  background: linear-gradient(180deg, #fff8f3, #ffeae0 60%, #ffd9e8);
+  margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, Ubuntu, Cantarell, "Helvetica Neue", Arial;
+  color: #3b3b3b;
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+}
+
+.wrap { width: min(920px, 92vw); margin: auto; text-align: center; }
+.card { background: #fff; border-radius: 24px; padding: 22px 18px; box-shadow: 0 10px 30px rgba(0,0,0,.08); }
+/* Headline */
+.headline {
+  font-family: "Playfair Display", Georgia, serif; /* Classy font */
+  font-weight: 700;
+  font-size: clamp(30px, 6vw, 48px);
+  margin: .2em 0 .2em;
+  color: #141124;
+
+  /* ↓ make background only hug the text */
+  display: inline-block;
+  padding: .2em .6em;
+  border-radius: 14px;
+  background-color: #8dcee6;
+}
+
+.lead { font-size: clamp(16px, 3.6vw, 19px); margin: .2em auto 1em; max-width: 60ch; }
+
+.row { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin: 10px 0 2px; }
+
+/* Buttons */
+.btn {
+  appearance: none; border: none; border-radius: 14px; padding: 14px 18px;
+  font-size: clamp(16px, 4vw, 18px); background: #ff69b4; color: white; cursor: pointer;
+  transition: transform .08s ease, filter .2s ease; box-shadow: 0 6px 18px rgba(214,46,136,.3);
+  font-weight: 700; letter-spacing: .3px;
+}
+.btn.small { padding: 10px 14px; font-size: 14px; }
+.btn:active { transform: scale(.98); }
+.btn[disabled] { filter: saturate(0.4) brightness(0.9); cursor: not-allowed; }
+.btn.secondary { background: #6c63ff; box-shadow: 0 6px 18px rgba(108,99,255,.28); }
+
+/* Status chip */
+.status {
+  display: inline-block; padding: 8px 12px; border-radius: 999px; background: #fff3fc; color: #b61671;
+  font-weight: 600; font-size: 14px; box-shadow: 0 10px 30px rgba(0,0,0,.08);
+}
+.status.good { background: #ecfff3; color: #136b2c; }
+.status.warn { background: #fff8e5; color: #7a5300; }
+
+.microcopy { display:flex; gap:10px; justify-content:center; align-items:center; margin-top:8px; flex-wrap:wrap; }
+
+/* SONG BAR */
+.songbar {
+  /* shrink to content instead of stretching */
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  background: #fcd3e3;
+  border: 1px solid #eee;
+  border-radius: 14px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.06);
+
+  /* center the inline-flex block */
+  margin: 0 auto;
+  width: auto;          /* (inline-flex already sizes to content) */
+  max-width: 92vw;      /* safety on very small screens */
+}
+
+/* make the progress track smaller so overall bar is shorter */
+.songbar-progress {
+  width: clamp(180px, 44vw, 320px);
+  height: 10px;
+  background: #f1f1f1;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.songbar-btn {
+  appearance:none; border:none; border-radius:10px; padding:10px 14px; background:#ff69b4; color:#fff; font-weight:700; cursor:pointer;
+  box-shadow: 0 6px 18px rgba(214,46,136,.25);
+}
+.songbar-fill { height:100%; width:0%; background:#6c63ff; }
+.songbar-time { font-variant-numeric: tabular-nums; min-width: 90px; }
+
+/* Cake */
+.cake { position: relative; width: min(420px, 90vw); height: calc(min(420px, 90vw) * 0.8); margin: 14px auto 0; }
+.plate {
+  width: 110%; height: 30%; position: absolute; bottom: 9%; left: -5%;
+  background-color: #ffd7e8; border-radius: 50%; box-shadow: 0 2px 0 #e6a9c1, 0 5px 40px rgba(0,0,0,0.12);
+}
+.cake > * { position: absolute; }
+.layer {
+  width: 100%; height: 50%; border-radius: 50%; background-color: #553c13;
+  box-shadow: 0 2px 0px #6a4b18, 0 4px 0px #33240b, 0 6px 0px #32230b, 0 8px 0px #31230b, 0 10px 0px #30220b, 0 12px 0px #2f220b;
+}
+.layer-top { top: 0%; } .layer-middle { top: 16.5%; } .layer-bottom { top: 33%; }
+.icing { top: 1%; left: 2%; background-color: #f0e4d0; width: 96%; height: 45%; border-radius: 50%; }
+.drip { display: block; width: 18%; height: 35%; border-bottom-left-radius: 25px; border-bottom-right-radius: 25px; background-color: #f0e4d0; }
+/* your updated drips */
+.drip1 { top: 25%; left: 2%; transform: skewY(15deg); height:26%; width: 12%; }
+.drip2 { top: 30%; left: 80%; height:22%; width: 12%; transform: skewY(-15deg); }
+.drip3 { top: 32%; left: 35%; width: 20%; height: 24%; border-bottom-left-radius: 40px; border-bottom-right-radius: 40px; }
+
+/* Candles (absolute, positioned via JS in %) */
+.candle {
+  --candle: #7B020B;
+  background: var(--candle);
+  width: 10px; height: 28px;
+  border-radius: 6px/3px;
+  z-index: 10;
+  position: absolute;
+  transform: translate(-50%, -100%); /* place base at coordinate */
+}
+.candle:before {
+  content:""; position:absolute; top:0; left:0; width:10px; height:6px; border-radius:50%;
+  background: var(--candle);
+}
+.candle.out .flame { display:none; }
+
+.candle.big { width: 14px; height: 44px; }
+.candle.big:before { width: 14px; height: 7px; }
+
+.flame {
+  position: absolute; background: orange; width: 8px; height: 18px;
+  border-radius: 8px 8px 8px 8px/18px 18px 8px 8px;
+  top: -22px; left: 50%; transform: translateX(-50%);
+  z-index: 10; transform-origin: 50% 90%;
+  box-shadow: 0 0 10px rgba(255,165,0,0.5), 0 0 20px rgba(255,165,0,0.5);
+  animation: flicker .9s ease-in-out alternate infinite;
+}
+.flame.big { width: 10px; height: 24px; top: -30px; }
+
+@keyframes flicker {
+  0% { transform: translateX(-50%) skewX(5deg); }
+  50% { transform: translateX(-50%) skewX(-8deg); }
+  100% { transform: translateX(-50%) skewX(5deg); }
+}
+
+/* Footer */
+footer { margin-top: 16px; font-size: 13px; opacity: .75; }

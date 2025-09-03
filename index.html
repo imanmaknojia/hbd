@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>🎂 Nani’s Birthday</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main class="wrap card">
+      <h1 class="headline">Happy Birthday, Nani! 🎉🎂</h1>
+      <p class="lead">
+        Tap the song bar to start the birthday tune, then gently <b>blow toward your phone</b> to put out the candles.
+      </p>
+
+      <!-- SONG BAR -->
+      <div class="songbar" role="group" aria-label="Birthday song controls">
+        <button id="songToggle" class="songbar-btn" aria-label="Play or pause the song">▶️ Play</button>
+        <div class="songbar-progress" aria-hidden="true">
+          <div id="songProgressFill" class="songbar-fill" style="width:0%"></div>
+        </div>
+        <div id="songTime" class="songbar-time" aria-live="polite">0:00 / 0:00</div>
+      </div>
+
+      <div class="microcopy">
+        <span id="micStatus" class="status warn">Microphone: starts listening when music plays…</span>
+        <button id="tapToBlow" class="btn small" style="display:none">💨 Tap to blow (backup)</button>
+      </div>
+
+      <!-- CAKE -->
+      <div class="cake" role="img" aria-label="Birthday cake with 67 evenly spaced candles">
+        <div class="plate"></div>
+        <div class="layer layer-bottom"></div>
+        <div class="layer layer-middle"></div>
+        <div class="layer layer-top"></div>
+        <div class="icing"></div>
+        <div class="drip drip1"></div>
+        <div class="drip drip2"></div>
+        <div class="drip drip3"></div>
+        <!-- Candles injected by JS -->
+      </div>
+
+      <div class="row" style="margin-top:14px">
+        <button id="relightBtn" class="btn secondary" disabled>🕯️ Relight candles</button>
+      </div>
+
+      <footer>Made with ❤️ by family. Works on phones & laptops. Mic is only used locally to detect blowing and only while music plays.</footer>
+    </main>
+
+    <script src="./script.js"></script>
+  </body>
+</html>
